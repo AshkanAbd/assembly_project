@@ -233,8 +233,9 @@ shift_num1:
 fill_num1_offset: 
     MOV DI, res_dot_x
     MOV num1[DI], 2EH
-
-    JMP remove_dots                  
+             
+    MOV AL, 1H         
+    JMP initial_print                  
         
 reformat_num2:
     MOV DI, 0H
@@ -262,8 +263,9 @@ shift_num2:
 fill_num2_offset:
     MOV DI, res_dot_x
     MOV num2[DI], 2EH
-
-    JMP remove_dots
+                  
+    MOV AL, 1H              
+    JMP initial_print
 
 remove_dots:
     MOV DI, res_dot_x
@@ -275,7 +277,7 @@ remove_dots_:
     
 dot_shift1: 
     CMP DI, num1_x
-    JE reformat_num2_
+    JE remove_dots_
     
     MOV CL, num1[DI+1] 
     MOV num1[DI], CL
@@ -291,8 +293,67 @@ dot_shift2:
     MOV num2[DI], CL
     INC DI
     
-    JMP dot_shift2    
-           
+    JMP dot_shift2
+    
+initial_print:
+    MOV DI, 0
+    
+    CMP AL, 1H
+    JE print_num1
+    
+    CMP AL, 2H
+    JE print_op
+    
+    CMP AL, 3H
+    JE print_num2
+    
+    CMP AL, 4H
+    JE print_equ
+    
+    JMP remove_dots                 
+
+print_num1:
+    MOV AL, 2H
+    
+    CMP DI, num1_x
+    JE initial_print
+    
+    MOV AH, 2H
+    MOV DL, num1[DI]
+    INT 21H
+    
+    INC DI
+    JMP print_num1                     
+                     
+print_op:
+    MOV AH, 2H
+    MOV DL, op
+    INT 21H
+    
+    MOV AL, 3H
+    JMP initial_print                                         
+
+print_num2:
+    MOV AL, 4H
+    
+    CMP DI, num2_x
+    JE initial_print
+    
+    MOV AH, 2H
+    MOV DL, num2[DI]
+    INT 21H
+    
+    INC DI
+    JMP print_num2
+                     
+print_equ:
+    MOV AH, 2H
+    MOV DL, ":"
+    INT 21H
+    
+    MOV AL, 5H
+    JMP initial_print                     
+
 calculate:
     CMP op, 2BH
     JE plus
@@ -305,8 +366,8 @@ calculate:
     
     CMP op, 2FH
     JE divide
-    JMP exit          
-
+    JMP exit  
+    
 plus:
     MOV DI, 0H 
     JMP plus_num1
@@ -385,25 +446,7 @@ divide:
     JMP print
     
 
-print:
-    MOV num1[5], 24H        
-    LEA DX, num1 
-    MOV AH, 09H
-    INT 21H 
-    
-    LEA DX, op
-    MOV AH, 09H
-    INT 21H
-    
-    MOV num2[5], 24H
-    LEA DX, num2 
-    MOV AH, 09H
-    INT 21H
-
-    MOV AH, 02H
-    MOV DL, ":"
-    INT 21H
-    
+print:    
     MOV DI, 0H  
     INC res_dot_x
     JMP print_result
@@ -426,6 +469,11 @@ print_result:
 print_dot:
     MOV AH, 02H
     MOV DL, 2EH
+    INT 21H 
+    
+    MOV AH, 02H
+    MOV DL, result[DI] 
+    ADD DL, 48
     INT 21H
     
     INC DI
