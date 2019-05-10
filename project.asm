@@ -7,21 +7,22 @@ num1_req_msg DB "Enter first number: $"
 num2_req_msg DB "Enter second number: $"  
 op_req_msg DB "Enter operator: $"  
 
-num1 DB 6 dup("0")
-num2 DB 6 dup("0")
-result DB 6 dup(0)
+num1 DB 10 dup("0")
+num2 DB 10 dup("0")
+result DB 9 dup(0)
 op DB 0H, 0H   
 
 num1_len DW 1 dup(0H)
 num2_len DW 1 dup(0H)
+res_len DW 9H
 
-num1_x DW 5H
-num2_x DW 5H
-res_x DW 6H
+num1_x DW 9H
+num2_x DW 9H
+res_x DW 9H
  
-dot1_x DW 5H 
-dot2_x Dw 5H
-res_dot_x DW 6H  
+dot1_x DW 9H 
+dot2_x Dw 9H
+res_dot_x DW 9H  
 
 dot_offset DW 0H 
 
@@ -79,7 +80,9 @@ shift1:
     JMP shift1 
 
 fill_num1:
-    MOV num1[4], AL
+    MOV BX, num1_x
+    DEC BX
+    MOV num1[BX], AL
 
     JMP scan_num1                
 
@@ -112,8 +115,10 @@ shift2:
     
     JMP shift2 
     
-fill_num2:
-    MOV num2[4], AL
+fill_num2: 
+    MOV BX, num2_x
+    DEC BX
+    MOV num2[BX], AL
     
     JMP scan_num2           
 
@@ -448,11 +453,11 @@ divide:
 
 print:    
     MOV DI, 0H  
-    INC res_dot_x
+    ;INC res_dot_x
     JMP print_result
     
 print_result: 
-    CMP DI, 6H
+    CMP DI, res_len 
     JE exit
     
     CMP DI, res_dot_x
