@@ -170,7 +170,7 @@ get_num2:
     
     MOV BL, AL
     SUB BL, 2CH
-    CMP BL, num1_fill
+    CMP BL, num2_fill
     JE change_sign2
  
     INC DI
