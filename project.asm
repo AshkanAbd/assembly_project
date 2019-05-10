@@ -261,13 +261,39 @@ clear_screen:
     JMP main
     
 prepare:
+    CMP CL, 0H
+    JE prepare_num1 
+    
+    CMP CL, 01H
+    JE prepare_op
+    
+    CMP CL, 02H
+    JE prepare_num2
+    
+    MOV AH, 02H
+    MOV DL, 3DH
+    INT 21H
+    
+    MOV AH, 02H
+    MOV DL, 20H
+    INT 21H
+    
+    JMP calculate
+    
+    
+prepare_num1:
+    MOV CL, 01H
+
     MOV AH, 02H
     MOV DL, 0AH
     INT 21H   
     
     MOV AX, num1_int
     CALL print_num
- 
+    
+    CMP num1_dot, 0H
+    JE prepare
+    
     LEA DX, dot_msg
     MOV AH, 09H
     INT 21H   
@@ -275,20 +301,17 @@ prepare:
     MOV AX, num1_dot
     CALL print_num
     
-    MOV AH, 02H
-    MOV DL, 20H
-    INT 21H
+    JMP prepare
     
-    MOV AH, 02H
-    MOV DL, op
-    INT 21H
-    
-    MOV AH, 02H
-    MOV DL, 20H
-    INT 21H
+
+prepare_num2:
+    MOV CL, 03H
     
     MOV AX, num2_int
     CALL print_num
+    
+    CMP num2_dot, 0H
+    JE prepare
     
     LEA DX, dot_msg
     MOV AH, 09H
@@ -301,15 +324,25 @@ prepare:
     MOV DL, 20H
     INT 21H
     
+    JMP prepare
+
+prepare_op:
+    MOV CL, 02H
+
     MOV AH, 02H
-    MOV DL, 3DH
+    MOV DL, 20H
+    INT 21H
+    
+    MOV AH, 02H
+    MOV DL, op
     INT 21H
     
     MOV AH, 02H
     MOV DL, 20H
     INT 21H
     
-    JMP calculate
+    JMP prepare
+
     
 find_res_dot:
     MOV AX, num1_dot 
@@ -334,6 +367,8 @@ res_dot_1:
 shift1:
     CMP DI, 0H
     MOV num2_int, AX
+    
+    MOV CL, 0H
     JE prepare
     
     DEC DI
@@ -356,6 +391,8 @@ res_dot_2:
 shift2:
     CMP DI, 0H
     MOV num1_int, AX
+    
+    MOV CL, 0H    
     JE prepare
     
     DEC DI
@@ -429,6 +466,9 @@ mode:
 print:
     MOV AX, res_int
     CALL print_num
+    
+    CMP res_dot, 0H
+    JE restart
     
     LEA DX, dot_msg
     MOV AH, 09H
