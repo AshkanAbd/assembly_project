@@ -17,14 +17,17 @@ num1_int DD 0H
 num1_dot DW 0H
 num1_fill DB 0H 
 num1_sign DB 1H
+num1_pow DW 1H
 
 num2_int DD 0H
 num2_dot DW 0H 
 num2_fill DB 0H
 num2_sign DB 1H
+num2_pow DW 1H
 
 res_int DD 0H
-res_dot DW 0H
+res_dot DW 0H 
+res_pow DW 1H
 
 op DB 0H
 
@@ -38,14 +41,17 @@ start:
     MOV num1_int, 0H
     MOV num1_dot, 0H 
     MOV num1_sign, 1H
+    MOV num1_pow, 1H
     
     MOV num2_fill, 0H
     MOV num2_int, 0H
     MOV num2_dot, 0H
     MOV num2_sign, 1H
+    MOV num2_pow, 1H
     
     MOV res_int, 0H
-    MOV res_dot, 0H
+    MOV res_dot, 0H  
+    MOV res_pow, 1H
     
     MOV op, 0H
             
@@ -262,13 +268,13 @@ clear_screen:
     
 prepare:
     CMP CL, 0H
-    JE prepare_num1 
+    JE prepare_num1_pow 
     
     CMP CL, 01H
     JE prepare_op
     
     CMP CL, 02H
-    JE prepare_num2
+    JE prepare_num2_pow
     
     MOV AH, 02H
     MOV DL, 3DH
@@ -279,50 +285,86 @@ prepare:
     INT 21H
     
     JMP calculate
+
     
+prepare_num1_pow:
+    MOV AX, 1H
+    MOV CH, 0AH
+    MOV DI, num1_dot 
+    
+    JMP calc_pow1
+                 
+                 
+calc_pow1:
+    CMP DI, 0H   
+    JE prepare_num1
+    
+    MUL CH
+    DEC DI
+    JMP calc_pow1
+            
     
 prepare_num1:
     MOV CL, 01H
-
+    MOV num1_pow, AX
+    
     MOV AH, 02H
     MOV DL, 0AH
     INT 21H   
     
     MOV AX, num1_int
+    MOV BL, b.num1_pow
+    IDIV BL
+    
+    MOV BL, AH
+    MOV AH, 0H
     CALL print_num
     
-    CMP num1_dot, 0H
-    JE prepare
+    MOV AH, 02H
+    MOV DL, 2EH
+    INT 21H
     
-    LEA DX, dot_msg
-    MOV AH, 09H
-    INT 21H   
-    
-    MOV AX, num1_dot
+    MOV AX, 0H
+    MOV AL, BL
     CALL print_num
     
     JMP prepare
+
+prepare_num2_pow:
+    MOV AX, 1H
+    MOV CH, 0AH
+    MOV DI, num2_dot 
     
+    JMP calc_pow2
+                 
+                 
+calc_pow2:
+    CMP DI, 0H   
+    JE prepare_num2
+    
+    MUL CH
+    DEC DI
+    JMP calc_pow2    
 
 prepare_num2:
     MOV CL, 03H
+    MOV num2_pow, AX   
     
     MOV AX, num2_int
+    MOV BL, b.num2_pow
+    IDIV BL
+    
+    MOV BL, AH
+    MOV AH, 0H
     CALL print_num
     
-    CMP num2_dot, 0H
-    JE prepare
-    
-    LEA DX, dot_msg
-    MOV AH, 09H
-    INT 21H
-    
-    MOV AX, num2_dot
-    CALL print_num   
- 
     MOV AH, 02H
-    MOV DL, 20H
+    MOV DL, 2EH
     INT 21H
+    
+    MOV AX, 0H
+    MOV AL, BL
+    CALL print_num
     
     JMP prepare
 
@@ -423,21 +465,21 @@ plus:
     ADD AX, num2_int
     MOV res_int, AX
     
-    JMP print               
+    JMP print_res           
 
 minus:
     MOV AX, num1_int
     SUB AX, num2_int
     MOV res_int, AX
     
-    JMP print
+    JMP print_res
     
 multiply:
     MOV AX, num1_int
     IMUL num2_int
     MOV res_int, AX        
 
-    JMP print
+    JMP print_res
     
 divide:
     CMP num2_int, 0H
@@ -449,7 +491,7 @@ divide:
     IDIV BL
     MOV b.res_int, AL
     
-    JMP print    
+    JMP print_res
 
 mode:
     CMP num2_int, 0H
@@ -461,27 +503,57 @@ mode:
     IDIV BL
     MOV b.res_int, AH
     
-    JMP print    
+    JMP print_res
+
+print_res:
+    MOV AX, 1H
+    MOV CH, 0AH
+    MOV DI, res_dot 
+    
+    JMP calc_res_pow
+                 
+                 
+calc_res_pow:
+    CMP DI, 0H   
+    JE print
+    
+    MUL CH
+    DEC DI
+    JMP calc_res_pow
     
 print:
+    MOV CL, 03H
+    MOV res_pow, AX   
+    
     MOV AX, res_int
+    MOV BL, b.res_pow
+    IDIV BL
+    
+    MOV BL, AH
+    MOV AH, 0H
     CALL print_num
     
-    CMP res_dot, 0H
-    JE restart
-    
-    LEA DX, dot_msg
-    MOV AH, 09H
+    MOV AH, 02H
+    MOV DL, 2EH
     INT 21H
     
-    MOV AX, res_dot
-    CALL print_num   
+    MOV AX, 0H
+    MOV AL, BL
+    CALL print_num
+       
+    MOV AH, 02H
+    MOV DL, 0AH
+    INT 21H  
     
     JMP restart
     
 print_error: 
     LEA DX, error_msg
     MOV AH, 09H
+    INT 21H
+    
+    MOV AH, 02H
+    MOV DL, 0AH
     INT 21H 
     
     JMP restart
