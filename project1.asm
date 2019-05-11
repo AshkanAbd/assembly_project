@@ -7,30 +7,24 @@ include "emu8086.inc"
 num1_req_msg DB 13, 10, "Enter first number: $"
 num2_req_msg DB 13, 10, "Enter second number: $"  
 op_req_msg DB 13, 10, "Enter operator(+,-,*,/,%): $" 
-      
+
+dot_msg DB "x10^-$"      
 error_msg DB "ERROR$"
 quit_msg DB 13, 10, "Press ('Q'/'q') to quit$"
 continue_msg DB 13, 10, "Press other keys to continue", 13, 10,"$"
 
 num1_int DD 0H
 num1_dot DW 1H
-num1_dot_ DW 1H
 num1_fill DB 0H 
 num1_sign DB 1H
-num1_pow DW 1H
 
 num2_int DD 0H
 num2_dot DW 1H 
-num2_dot_ DW 1H
 num2_fill DB 0H
 num2_sign DB 1H
-num2_pow DW 1H
 
 res_int DD 0H
-res_dot DW 1H 
-res_pow DW 1H 
-
-better_dot DB 0H
+res_dot DW 1H
 
 op DB 0H
 
@@ -42,21 +36,16 @@ start:
                 
     MOV num1_fill, 0H
     MOV num1_int, 0H
-    MOV num1_dot, 0H
-    MOV num1_dot_, 1H 
+    MOV num1_dot, 1H 
     MOV num1_sign, 1H
-    MOV num1_pow, 1H
     
     MOV num2_fill, 0H
     MOV num2_int, 0H
-    MOV num2_dot, 0H
-    MOV num2_dot_, 1H
+    MOV num2_dot, 1H
     MOV num2_sign, 1H
-    MOV num2_pow, 1H
     
     MOV res_int, 0H
-    MOV res_dot, 0H  
-    MOV res_pow, 1H
+    MOV res_dot, 1H
     
     MOV op, 0H
             
@@ -90,7 +79,7 @@ req_num1:
     LEA DX, num1_req_msg
     INT 21H
     
-    MOV DI , 0H
+    MOV DI , 1H
     JMP get_num1      
 
 get_num1:
@@ -115,25 +104,9 @@ get_num1:
     SUB BL, 2CH
     CMP BL, num1_fill
     JE change_sign1            
- 
-    MOV BL, AL
-    CMP BL, 30H
-    JL invalid_num1
-    
-    CMP BL, 39H
-    JG invalid_num1
     
     INC DI
     JMP add_int1
-
-invalid_num1:
-    MOV num1_fill, 0H
-    MOV num1_int, 0H
-    MOV num1_dot, 0H 
-    MOV num1_sign, 1H
-    MOV num1_pow, 1H
-    
-    JMP clear_screen
     
 change_sign1:
     MOV num1_sign, 0FFH
@@ -174,7 +147,7 @@ req_num2:
     LEA DX, num2_req_msg
     INT 21H
     
-    MOV DI, 0H
+    MOV DI, 1H
     JMP get_num2
 
 get_num2:
@@ -198,26 +171,10 @@ get_num2:
     MOV BL, AL
     SUB BL, 2CH
     CMP BL, num2_fill
-    JE change_sign2 
-    
-    MOV BL, AL
-    CMP BL, 30H
-    JL invalid_num2
-    
-    CMP BL, 39H
-    JG invalid_num2
+    JE change_sign2
  
     INC DI
-    JMP add_int2
-    
-invalid_num2:
-    MOV num2_fill, 0H
-    MOV num2_int, 0H
-    MOV num2_dot, 0H 
-    MOV num2_sign, 1H
-    MOV num2_pow, 1H
-    
-    JMP clear_screen     
+    JMP add_int2 
     
 change_sign2:
     MOV num2_sign, 0FFH
@@ -305,18 +262,15 @@ clear_screen:
     
 prepare:
     CMP CL, 0H
-    JE prepare_num1_pow 
+    JE prepare_num1 
     
     CMP CL, 01H
     JE prepare_op
     
     CMP CL, 02H
-    JE prepare_num2_pow
+    JE prepare_num2
     
     MOV AH, 02H
-    MOV DL, 20H
-    INT 21H
-    
     MOV DL, 3DH
     INT 21H
     
@@ -325,130 +279,53 @@ prepare:
     INT 21H
     
     JMP calculate
-
     
-prepare_num1_pow:
-    MOV CL, 01H
-    
-    MOV AX, 1H
-    MOV CH, 0AH
-    MOV DI, 0H
-    
-    JMP calc_pow1
-                 
-                 
-calc_pow1:
-    CMP AX, num1_int
-    JG prepare_num1
-    
-    MUL CH
-    INC DI
-    JMP calc_pow1
-            
     
 prepare_num1:
-    MOV num1_pow, DI
-    
+    MOV CL, 01H
+
     MOV AH, 02H
     MOV DL, 0AH
     INT 21H   
     
-    CMP DI, 0H
-    JE print_num1
-    
-    MOV DI, num1_dot
-    
-    CMP DI, num1_pow
-    JL print_num1
-    
-    MOV AH, 02H
-    MOV DL, 30H
-    INT 21H
-    
-    MOV DL, 2EH
-    INT 21H
-    
-    SUB DI, num1_pow
-    
-    JMP put_zero1
-        
-put_zero1:
-    CMP DI, 0H
-    JE print_num1
-    
-    DEC DI     
-    
-    MOV AH, 02H  
-    MOV DL, 30H
-    INT 21H
-    
-    JMP put_zero1
-    
-print_num1:
     MOV AX, num1_int
     CALL print_num
     
-    JMP prepare
+    CMP num1_dot, 0H
+    JE prepare
     
-prepare_num2_pow:
-    MOV CL, 03H
+    LEA DX, dot_msg
+    MOV AH, 09H
+    INT 21H   
     
-    MOV AX, 1H
-    MOV CH, 0AH
-    MOV DI, 0H
-    
-    JMP calc_pow2
-                 
-                 
-calc_pow2:
-    CMP AX, num2_int
-    JG prepare_num2
-    
-    MUL CH
-    INC DI
-    JMP calc_pow2
-            
-    
-prepare_num2:
-    MOV num2_pow, DI
-    
-    CMP DI, 0H
-    JE print_num2
-    
-    MOV DI, num2_dot 
-    
-    CMP DI, num2_pow
-    JL print_num2
-    
-    MOV AH, 02H
-    MOV DL, 30H
-    INT 21H
-    
-    MOV DL, 2EH
-    INT 21H
-    
-    SUB DI, num2_pow
-    
-    JMP put_zero2
-        
-put_zero2:
-    CMP DI, 0H
-    JE print_num2
-    
-    DEC DI     
-    
-    MOV AH, 02H  
-    MOV DL, 30H
-    INT 21H
-    
-    JMP put_zero2
-    
-print_num2:
-    MOV AX, num2_int
+    MOV AX, num1_dot
     CALL print_num
     
     JMP prepare
     
+
+prepare_num2:
+    MOV CL, 03H
+    
+    MOV AX, num2_int
+    CALL print_num
+    
+    CMP num2_dot, 0H
+    JE prepare
+    
+    LEA DX, dot_msg
+    MOV AH, 09H
+    INT 21H
+    
+    MOV AX, num2_dot
+    CALL print_num   
+ 
+    MOV AH, 02H
+    MOV DL, 20H
+    INT 21H
+    
+    JMP prepare
+
 prepare_op:
     MOV CL, 02H
 
@@ -479,16 +356,7 @@ res_dot_1:
     MOV AX, num1_dot
     MOV res_dot, AX 
     
-    SUB AX, num2_dot       
-    
-    MOV DI, num1_dot
-    MOV num1_dot_, DI
-    MOV DI, num2_dot
-    MOV num2_dot_, DI
-    
-    ADD num2_dot, AX
-    
-    MOV better_dot, 1H
+    SUB AX, num2_dot
     
     MOV DI, AX
     MOV AX, num2_int
@@ -513,15 +381,6 @@ res_dot_2:
     MOV res_dot, AX
     
     SUB AX, num1_dot
-    
-    MOV DI, num1_dot
-    MOV num1_dot_, DI
-    MOV DI, num2_dot
-    MOV num2_dot_, DI
-    
-    ADD num1_dot, AX  
-    
-    MOV better_dot, 0H
     
     MOV DI, AX
     MOV AX, num1_int
@@ -564,25 +423,21 @@ plus:
     ADD AX, num2_int
     MOV res_int, AX
     
-    JMP print_res           
+    JMP print               
 
 minus:
     MOV AX, num1_int
     SUB AX, num2_int
     MOV res_int, AX
     
-    JMP print_res
+    JMP print
     
 multiply:
     MOV AX, num1_int
     IMUL num2_int
-    MOV res_int, AX
-    
-    MOV AX, num1_dot
-    ADD AX, num2_dot
-    MOV res_dot, AX        
+    MOV res_int, AX        
 
-    JMP print_res
+    JMP print
     
 divide:
     CMP num2_int, 0H
@@ -593,25 +448,8 @@ divide:
     
     IDIV BL
     MOV b.res_int, AL
-
-    CMP better_dot, 1H
-    JE divide_
     
-    JMP divide_1   
-    
-divide_:
-    MOV AX, num1_dot_
-    SUB AX, num2_dot_
-    MOV res_dot, AX
-                   
-    JMP print_res
-
-divide_1:
-    MOV AX, num2_dot_
-    SUB AX, num2_dot_
-    MOV res_dot, AX
-
-    JMP print_res
+    JMP print    
 
 mode:
     CMP num2_int, 0H
@@ -623,79 +461,27 @@ mode:
     IDIV BL
     MOV b.res_int, AH
     
-    JMP print_res
-
-print_res:
-    MOV CL, 01H
+    JMP print    
     
-    MOV AX, 1H
-    MOV CH, 0AH
-    MOV DI, 0H
-    
-    JMP calc_res_pow
-                 
-                 
-calc_res_pow:
-    CMP AX, res_int
-    JG prepare_res
-    
-    MUL CH
-    INC DI
-    JMP calc_res_pow
-            
-    
-prepare_res:
-    MOV res_pow, DI
-    
-    CMP DI, 0H
-    JE print_res_num
- 
-    MOV DI, res_dot
-    
-    CMP DI, res_pow
-    JL print_res_num
-    
-    MOV AH, 02H
-    MOV DL, 30H
-    INT 21H
-    
-    MOV DL, 2EH
-    INT 21H
-    
-    MOV DI, res_dot
-    SUB DI, res_pow
-    
-    JMP put_zero_res
-        
-put_zero_res:
-    CMP DI, 0H
-    JE print_res_num
-    
-    DEC DI     
-    
-    MOV AH, 02H  
-    MOV DL, 30H
-    INT 21H
-    
-    JMP put_zero_res
-    
-print_res_num:
+print:
     MOV AX, res_int
     CALL print_num
     
-    MOV AH, 02H
-    MOV DL, 0AH
-    INT 21H  
+    CMP res_dot, 0H
+    JE restart
     
-    JMP restart
-        
-print_error: 
-    LEA DX, error_msg
+    LEA DX, dot_msg
     MOV AH, 09H
     INT 21H
     
-    MOV AH, 02H
-    MOV DL, 0AH
+    MOV AX, res_dot
+    CALL print_num   
+    
+    JMP restart
+    
+print_error: 
+    LEA DX, error_msg
+    MOV AH, 09H
     INT 21H 
     
     JMP restart
@@ -725,4 +511,3 @@ exit:
     DEFINE_PRINT_NUM
     DEFINE_PRINT_NUM_UNS    
     END
-    
