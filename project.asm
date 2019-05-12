@@ -359,7 +359,7 @@ prepare_num1:
     MOV DI, num1_dot
     
     CMP DI, num1_pow
-    JL print_num1
+    JL print_num1_
     
     MOV AH, 02H
     MOV DL, 30H
@@ -370,7 +370,44 @@ prepare_num1:
     
     SUB DI, num1_pow
     
-    JMP put_zero1
+    JMP put_zero1 
+    
+print_num1_:
+    MOV AX, 01H
+    MOV DI, num1_dot
+    MOV BL, 0AH
+    
+    JMP calc_pow1_
+    
+calc_pow1_:
+    CMP DI, 0H
+    JE prepare_num1_
+    
+    MUL BL
+    DEC DI
+    
+    JMP calc_pow1_
+        
+prepare_num1_:
+    MOV BH, AL
+    MOV AX, num1_int
+    
+    DIV BH
+    MOV BL, AH
+    MOV AH, 0H
+    
+    CALL print_num
+    
+    MOV AH, 02H
+    MOV DL, 2EH
+    INT 21H
+    
+    MOV AX, 0H
+    MOV AL, BL
+    
+    CALL print_num
+    
+    JMP prepare 
         
 put_zero1:
     CMP DI, 0H
@@ -406,8 +443,8 @@ calc_pow2:
     
     MUL CH
     INC DI
-    JMP calc_pow2
-            
+    JMP calc_pow2     
+
     
 prepare_num2:
     MOV num2_pow, DI
@@ -418,7 +455,7 @@ prepare_num2:
     MOV DI, num2_dot 
     
     CMP DI, num2_pow
-    JL print_num2
+    JL print_num2_
     
     MOV AH, 02H
     MOV DL, 30H
@@ -429,7 +466,44 @@ prepare_num2:
     
     SUB DI, num2_pow
     
-    JMP put_zero2
+    JMP put_zero2 
+    
+print_num2_:
+    MOV AX, 01H
+    MOV DI, num2_dot
+    MOV BL, 0AH
+    
+    JMP calc_pow2_
+    
+calc_pow2_:
+    CMP DI, 0H
+    JE prepare_num2_
+    
+    MUL BL
+    DEC DI
+    
+    JMP calc_pow2_
+        
+prepare_num2_:
+    MOV BH, AL
+    MOV AX, num2_int
+    
+    DIV BH
+    MOV BL, AH
+    MOV AH, 0H
+    
+    CALL print_num
+    
+    MOV AH, 02H
+    MOV DL, 2EH
+    INT 21H
+    
+    MOV AX, 0H
+    MOV AL, BL
+    
+    CALL print_num
+    
+    JMP prepare    
         
 put_zero2:
     CMP DI, 0H
@@ -653,7 +727,7 @@ prepare_res:
     MOV DI, res_dot
     
     CMP DI, res_pow
-    JL print_res_num
+    JL print_res_
     
     MOV AH, 02H
     MOV DL, 30H
@@ -678,6 +752,43 @@ put_zero_res:
     INT 21H
     
     JMP put_zero_res
+    
+print_res_:
+    MOV AX, 01H
+    MOV DI, res_dot
+    MOV BL, 0AH
+    
+    JMP calc_res_
+    
+calc_res_:
+    CMP DI, 0H
+    JE prepare_res_
+    
+    MUL BL
+    DEC DI
+    
+    JMP calc_res_
+        
+prepare_res_:
+    MOV BH, AL
+    MOV AX, res_int
+    
+    DIV BH
+    MOV BL, AH
+    MOV AH, 0H
+    
+    CALL print_num
+    
+    MOV AH, 02H
+    MOV DL, 2EH
+    INT 21H
+    
+    MOV AX, 0H
+    MOV AL, BL
+    
+    CALL print_num
+    
+    JMP restart    
     
 print_res_num:
     MOV AX, res_int
