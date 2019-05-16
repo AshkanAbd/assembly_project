@@ -12,21 +12,24 @@ dot_msg     DB    "x10^$"
 quit_msg DB 13, 10, "Press ('Q'/'q') to quit$"
 continue_msg DB 13, 10, "Press other keys to continue", 13, 10,"$"
 
-num1_int        DD      0H 
+num1_int        DD      0H
+num1_int_abs    DD      0H 
 num1_dot        DW      0H
 num1_dot_       DW      0H
 num1_fill       DB      0H 
-num1_sign       DD      1H
+num1_sign       DB      1H
 num1_pow        DW      1H
 
 num2_int        DD      0H
+num2_int_abs    DD      0H
 num2_dot        DW      0H 
 num2_dot_       DW      0H
 num2_fill       DB      0H
-num2_sign       DD      1H
+num2_sign       DB      1H
 num2_pow        DW      1H
 
-res_int         DD      0H  
+res_int         DD      0H
+res_int1        DD      0H  
 res_dot         DW      0H 
 res_pow         DW      1H 
 
@@ -36,6 +39,8 @@ ten             DW      0AH
 len             DW      0H
 tmp             DD      ? 
 tmp1            DD      ?
+tmp2            DD      ?
+tmp3            DD      ?           
 
 .code
 
@@ -49,7 +54,8 @@ start:
     CALL reset_num2
     
     ; Reset result
-    MOV res_int, 0H 
+    MOV res_int, 0H
+    MOV res_int1, 0H 
     MOV res_dot, 0H  
     MOV res_pow, 1H
     
@@ -61,6 +67,7 @@ start:
 reset_num1:
     MOV num1_fill, 0H
     MOV num1_int, 0H 
+    MOV num1_int_abs, 0H
     MOV num1_dot, 0H
     MOV num1_dot_, 0H 
     MOV num1_sign, 1H
@@ -71,6 +78,7 @@ reset_num1:
 reset_num2:
     MOV num2_fill, 0H
     MOV num2_int, 0H
+    MOV num2_int_abs, 0H
     MOV num2_dot, 0H
     MOV num2_dot_, 0H
     MOV num2_sign, 1H
@@ -93,10 +101,6 @@ main:
     ; Check operator        
     CMP op, 0H
     JE req_op 
-    
-    ; Set nums sign
-    CALL change_sign1
-    CALL change_sign2
                                   
     JMP find_res_dot
 
@@ -134,14 +138,9 @@ get_num1:
     CMP AL, 2EH
     JE find_dot1 
     
-    ; Check valid "-" pressed            
-    MOV AH, 0H            
+    ; Check valid "-" pressed 
+    MOV AH, 0H           
     CMP AL, 2DH
-    
-    MOV BL, AL
-    XOR BL, num1_fill
- 
-    CMP BL, 2CH
     JE save_sign1            
     
     ; Check other character pressed
@@ -161,24 +160,54 @@ invalid_num1:
     JMP main
     
 save_sign1:
+    CMP num1_fill, 1H
+    JNE invalid_num1
+    
     ; Save "-" pressed
-    MOV num1_sign, 0FFFFH
+    MOV num1_sign, 0FFH
     
     JMP get_num1
     
 change_sign1:
-    ; Load num1 to AX, DX
-    MOV AX, [num1_int]
-    MOV DX, [num1_int+2]
- 
-    ; Set sign     
-    IMUL num1_sign 
+    CMP num1_sign, 1H
+    JE change_sign1_                  
+                     
+    ; Negative tmp1 
+    ; Set tmp1 to 0xFFFFFFFF (-1)
+    MOV [tmp1], 0FFFFH
+    MOV [tmp1+2], 0FFFFH
     
-    ; Load AX, DX to num1
+    ; Load tmp to AX, DX
+    MOV AX, [num1_int]
+    MOV DX, [num1_int+2] 
+    
+    ; Save abs value in _abs
+    MOV [num1_int_abs], AX
+    MOV [num1_int_abs+2], DX
+  
+    ; tmp1 - tmp  
+    SUB [tmp1], AX
+    SUB [tmp1+2], DX
+    
+    ; tmp++
+    INC tmp1
+    
+    ; Load tmp1 to AX, DX
+    MOV AX, [tmp1]
+    MOV DX, [tmp1+2]
+    
     MOV [num1_int], AX
-    MOV [num1_int+2], DX 
+    MOV [num1_int+2], DX
     
     RET        
+    
+change_sign1_:  
+    MOV AX, [num1_int]
+    MOV DX, [num1_int+2]
+    
+    MOV [num1_int_abs], AX
+    MOV [num1_int_abs+2], DX
+    RET    
 
 add_int1:
     ; Save input char in CL
@@ -260,11 +289,6 @@ get_num2:
     
     MOV AH, 0H            
     CMP AL, 2DH
-    
-    MOV BL, AL
-    XOR BL, num2_fill
- 
-    CMP BL, 2CH
     JE save_sign2       
     
     MOV BL, AL
@@ -282,21 +306,52 @@ invalid_num2:
     
     JMP main     
     
-save_sign2:
-    MOV num2_sign, 0FFFFH
+save_sign2: 
+    CMP num2_fill, 1H
+    JNE invalid_num2
+
+    MOV num2_sign, 0FFH
     
     JMP get_num2 
     
 change_sign2:
+    CMP num2_sign, 1H
+    JE change_sign2_
+    
+    ; Negative tmp1 
+    ; Set tmp1 to 0xFFFFFFFF (-1)
+    MOV [tmp1], 0FFFFH
+    MOV [tmp1+2], 0FFFFH
+    
     MOV AX, [num2_int]
     MOV DX, [num2_int+2]
+ 
+    ; Save abs value in _abs
+    MOV [num2_int_abs], AX
+    MOV [num2_int_abs+2], DX
+  
+    SUB [tmp1], AX
+    SUB [tmp1+2], DX  
     
-    IMUL num2_sign    
+    ; tmp1++
+    INC tmp1
     
-    MOV [num2_int], AX    
+    ; Load tmp1 to AX, DX
+    MOV AX, [tmp1]
+    MOV DX, [tmp1+2]
+    
+    MOV [num2_int], AX
     MOV [num2_int+2], DX
     
     RET
+    
+change_sign2_: 
+    MOV AX, [num2_int]
+    MOV DX, [num2_int+2]
+    
+    MOV [num2_int_abs], AX
+    MOV [num2_int_abs+2], DX
+    RET    
 
 add_int2:
     MOV CL, AL                
@@ -459,10 +514,6 @@ prepare_num1:
     
     CALL print_num
     
-    ;MOV AX, [num1_dot]
-    ;MOV DX, [num1_dot+2]
-    ;CALL print_dot
-    
     JMP prepare
                
 prepare_num2:
@@ -474,10 +525,6 @@ prepare_num2:
     MOV DI, num2_dot                 
                      
     CALL print_num
-                   
-    ;MOV AX, [num2_dot]
-    ;MOV DX, [num2_dot+2]
-    ;CALL print_dot
     
     JMP prepare
    
@@ -497,8 +544,20 @@ prepare_op:
     MOV DL, 20H
     INT 21H
     
-    JMP prepare
+    JMP prepare  
+    
+change_nums_sign:
 
+    ; Set nums sign
+    CALL change_sign1
+    CALL change_sign2    
+    
+    RET   
+    
+prepare_nums:
+    CALL change_nums_sign
+    
+    JMP prepare    
     
 find_res_dot:
     ; Load num1_dot to AX
@@ -534,28 +593,96 @@ res_dot_1:
     MOV AX, [num2_int]
     MOV DX, [num2_int+2]
     
-    MOV BL, 0AH
     ; Start shifting num2                   
     JMP shift1
     
 shift1:
     ; Check end condition
     CMP DI, 0H
-    
-    ; Load AX, DX to num2_int
-    MOV [num2_int], AX
-    MOV [num2_int+2], DX   
-    
-    
+       
     MOV CL, 0H
-    JE prepare
+    JE prepare_nums
     
-    CALL change_dot_dif
+    CALL change_dot_dif 
     
-    ; Shift AX, DX
-    IMUL BL
+    MOV AX, [num2_int]
+    MOV DX, [num2_int+2]
+    MOV BX, ten
+    CALL _multiply_
     
-    JMP shift1    
+    MOV [num2_int], AX
+    MOV [num2_int+2], DX  
+    
+    JMP shift1
+    
+_multiply_:
+    MOV [tmp], AX
+    MOV [tmp+2], DX 
+    MOV [tmp1], 0H
+    MOV [tmp1+2], 0H 
+    MOV [tmp3], 0H
+    MOV [tmp3+2], 0H
+    MOV [tmp2], CX
+    MOV DX, 0H
+    MOV AX, 0H
+    ;;;;
+    MOV AX, 0H
+    MOV AL, b.[tmp]
+    MUL BX
+    ADD [tmp1], AX
+    ;;;;
+    PUSH DX
+    MOV DX, 0H
+    MOV AX, 0H
+    MOV AL, b.[tmp+1]
+    MUL BX
+    ADD [tmp1+1], AX
+    POP CX
+    ADD [tmp1+2], CX
+    ;;;;
+    PUSH DX
+    MOV DX, 0H
+    MOV AX, 0H
+    MOV AL, b.[tmp+2]
+    MUL BX
+    ADD [tmp1+2], AX
+    POP CX
+    ADD [tmp1+3], CX
+    ;;;;
+    PUSH DX
+    MOV DX, 0H
+    MOV AX, 0H
+    MOV AL, b.[tmp+3]
+    MUL BX
+    ;;;; For handle 2 32-bit memory address with no overflow
+    PUSH DX
+    PUSH AX
+    MOV AX, 0H
+    MOV DX, 0H
+    MOV AL, b.[tmp1+3]
+    POP DX
+    MOV DX, AX
+    MOV b.[tmp1+3], DL
+    ADD b.[tmp3], DH
+    POP DX
+    ADD [tmp3], DX
+    POP DX
+    ADD [tmp3], DX
+    
+    ;ADD b.[tmp1+3], AL
+    ;ADD b.[tmp2], AH
+    ;POP CX
+     
+    ;ADD b.[tmp1+4], CL
+    ;;;; 
+    
+    ; Result in BX:DX:AX
+    MOV AX, [tmp1]
+    MOV DX, [tmp1+2]
+    MOV BX, [tmp3]
+    MOV CX, [tmp2]
+    
+    RET        
     
 res_dot_2:
     MOV AX, num2_dot
@@ -574,22 +701,24 @@ res_dot_2:
     
     MOV AX, [num1_int]
     MOV DX, [num1_int+2]
-    
-    MOV BL, 0AH    
        
     JMP shift2
 
 shift2:
     CMP DI, 0H
+       
+    MOV CL, 0H
+    JE prepare_nums
+    
+    CALL change_dot_dif 
+    
+    MOV AX, [num1_int]
+    MOV DX, [num1_int+2]
+    MOV BX, ten
+    CALL _multiply_
+    
     MOV [num1_int], AX
-    MOV [num1_int+2], DX
-    
-    MOV CL, 0H    
-    JE prepare
-    
-    CALL change_dot_dif
-    
-    IMUL BL
+    MOV [num1_int+2], DX  
     
     JMP shift2 
     
@@ -607,7 +736,6 @@ dec_dot:
     
     RET    
         
-    
 calculate:
     ; Check operator
     CMP op, 2BH
@@ -653,13 +781,9 @@ minus:
     JMP print_res
     
 multiply:
-    MOV AX, [num1_int]
-    MOV DX, [num1_int+2]
+    CALL multiply_  
     
-    IMUL num2_int
-    
-    MOV [res_int], AX
-    MOV [res_int+2], DX
+    CALL change_res_sign
     
     ; Set result dot index
     MOV AX, num1_dot
@@ -667,36 +791,48 @@ multiply:
     MOV res_dot, AX        
 
     JMP print_res
+
+multiply_:
+    CMP [num2_int_abs+2], 0H
+    JA multiply__
     
-__divide:  
-    ; Check for divide on zero
-    CMP num2_int, 0H
-    JE print_error  
+    MOV AX, [num1_int_abs]
+    MOV DX, [num1_int_abs+2]
+    MOV BX, [num2_int_abs]
     
-    MOV AX, [num1_int]
-    MOV DX, [num1_int+2]
+    CALL _multiply_  
     
-    IDIV num2_int
+    MOV [res_int], AX  
+    MOV [res_int+2], DX
+    MOV [res_int1], BX
+    
+    RET
+    
+multiply__:
+    MOV AX, [num2_int_abs]
+    MOV DX, [num2_int_abs+2]
+    MOV BX, [num1_int_abs]
+    
+    CALL _multiply_
     
     MOV [res_int], AX
+    MOV [res_int+2], DX
+    MOV [res_int1], BX
     
-    ; Set result dot index 
-    MOV AX, num1_dot
-    SUB AX, num2_dot
-    MOV res_dot, AX
-                   
-    JMP print_res  
-
+    RET    
+    
 divide:
     CALL check_divide
     JZ print_error
     
-    MOV AX, [num1_int]
-    MOV DX, [num1_int+2]
-    CALL division  
+    MOV AX, [num1_int_abs]
+    MOV DX, [num1_int_abs+2]
+    CALL division 
     
     MOV [res_int], AX
-    MOV [res_int+2], DX
+    MOV [res_int+2], DX 
+ 
+    CALL change_res_sign 
     
     ; Set result dot index 
     MOV AX, num1_dot
@@ -725,30 +861,30 @@ division:
     
     MOV [tmp1], 0H
     MOV [tmp1+2], 0H     
-    
+       
     ;;;;      
     MOV AL, b.[tmp+3]
     MOV AX, 0H
     XOR DX, DX
-    DIV [num2_int]
+    DIV [num2_int_abs]
     MOV b.[tmp1+3], AL
     ;;;;      
     MOV AL, b.[tmp+2]
     MOV AH, DL
     XOR DX, DX
-    DIV ten
+    DIV [num2_int_abs]
     MOV b.[tmp1+2], AL
     ;;;;      
     MOV AL, b.[tmp+1]
     MOV AH, DL
     XOR DX, DX
-    DIV [num2_int]
+    DIV [num2_int_abs]
     MOV b.[tmp1+1], AL
     ;;;;      
     MOV AL, b.[tmp]
     MOV AH, DL
     XOR DX, DX
-    DIV [num2_int]
+    DIV [num2_int_abs]
     MOV b.[tmp1], AL
     ;;;;
     
@@ -771,27 +907,46 @@ check_divide:
     RET    
     
 check_divide_:
-    RET  
-    
-check_res_sign:
-    
-    MOV AX, [res_int]
-    MOV DX, [res_int+2]
-    
-    TEST AX, AX
-    ;JS change_res_sign
-    
-    RET    
+    RET     
 
 change_res_sign:
-    MOV BX, 0FFFFH
-    IMUL BX
+    MOV AX, 0H
+    MOV AL, num1_sign
+    ADD AL, num2_sign
+    CMP AL, 0H
+    JNE change_res_sign_
 
+    ; Negative tmp1 
+    ; Set tmp1 to 0xFFFFFFFF (-1)
+    MOV [tmp1], 0FFFFH
+    MOV [tmp1+2], 0FFFFH
+    
+    ; Load tmp to AX, DX
+    MOV AX, [res_int]
+    MOV DX, [res_int+2] 
+    
+    ; tmp1 - tmp  
+    SUB [tmp1], AX
+    SUB [tmp1+2], DX
+    
+    ; tmp++
+    INC tmp1
+    
+    ; Load tmp1 to AX, DX
+    MOV AX, [tmp1]
+    MOV DX, [tmp1+2]
+    
+    MOV [res_int], AX
+    MOV [res_int+2], DX
+
+    RET
+    
+change_res_sign_:
     RET    
 
 print_res:
-    ;CALL check_res_sign
-    
+    CALL check_res_extra
+
     ; Load and print res_int in AX, DX
     MOV AX, [res_int]
     MOV DX, [res_int+2] 
@@ -801,6 +956,21 @@ print_res:
     CALL print_num
     
     JMP restart
+    
+check_res_extra:
+    CMP res_int1, 0H
+    JNA no_res_extra
+ 
+    MOV AX, [res_int1]
+    MOV DX, [res_int1+2]
+    MOV DI, 0H
+    
+    CALL print_num
+    
+    RET
+    
+no_res_extra:
+    RET        
                          
 print_error: 
     LEA DX, error_msg
@@ -851,7 +1021,7 @@ print_nums:
     
     ;;;;      
     MOV AL, b.[tmp+3]
-    MOV AX, 0H
+    MOV AH, 0H
     XOR DX, DX
     DIV ten
     MOV b.[tmp1+3], AL
@@ -998,6 +1168,9 @@ change_sign_neg:
 end_print:
     RET  
     
-exit:    
+exit:
+    MOV AH, 0
+    INT 21H
+      
     END
     
