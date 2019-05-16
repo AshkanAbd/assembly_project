@@ -1,5 +1,8 @@
+.8086
 
-.stack
+.model small
+
+.stack 100H
 
 .data
 
@@ -40,7 +43,8 @@ len             DW      0H
 tmp             DD      ? 
 tmp1            DD      ?
 tmp2            DD      ?
-tmp3            DD      ?           
+tmp3            DD      ?
+tmp4            DD      ?           
 
 .code
 
@@ -509,10 +513,13 @@ prepare_num1:
     ; Load and print num1
     MOV AX, [num1_int]
     MOV DX, [num1_int+2]
+    MOV [tmp3], CX
+    XOR CX, CX
     
     MOV DI, num1_dot
     
     CALL print_num
+    MOV CX, [tmp3]
     
     JMP prepare
                
@@ -521,10 +528,13 @@ prepare_num2:
     
     MOV AX, [num2_int]
     MOV DX, [num2_int+2]
+    MOV [tmp3], CX
+    XOR CX, CX
     
     MOV DI, num2_dot                 
                      
     CALL print_num
+    MOV CX, [tmp3]
     
     JMP prepare
    
@@ -661,19 +671,13 @@ _multiply_:
     MOV DX, 0H
     MOV AL, b.[tmp1+3]
     POP DX
-    MOV DX, AX
+    ADD DX, AX
     MOV b.[tmp1+3], DL
     ADD b.[tmp3], DH
     POP DX
     ADD [tmp3], DX
     POP DX
     ADD [tmp3], DX
-    
-    ;ADD b.[tmp1+3], AL
-    ;ADD b.[tmp2], AH
-    ;POP CX
-     
-    ;ADD b.[tmp1+4], CL
     ;;;; 
     
     ; Result in BX:DX:AX
@@ -918,26 +922,33 @@ change_res_sign:
 
     ; Negative tmp1 
     ; Set tmp1 to 0xFFFFFFFF (-1)
-    MOV [tmp1], 0FFFFH
-    MOV [tmp1+2], 0FFFFH
+    ; Set tmp2 + 2 to 0xFFFF (-1)    
+    MOV [tmp1], 0xFFFF
+    MOV [tmp1+2], 0xFFFF
+    MOV [tmp2+2], 0xFFFF
     
     ; Load tmp to AX, DX
     MOV AX, [res_int]
-    MOV DX, [res_int+2] 
+    MOV DX, [res_int+2]
+    MOV CX, [res_int1] 
     
     ; tmp1 - tmp  
     SUB [tmp1], AX
-    SUB [tmp1+2], DX
+    SUB [tmp1+2], DX 
+    SUB [tmp2+2], CX
     
     ; tmp++
     INC tmp1
     
     ; Load tmp1 to AX, DX
+    ; Load tmp2+2 to CX
     MOV AX, [tmp1]
     MOV DX, [tmp1+2]
+    MOV CX, [tmp2+2]
     
     MOV [res_int], AX
     MOV [res_int+2], DX
+    MOV [res_int1], CX
 
     RET
     
@@ -945,32 +956,19 @@ change_res_sign_:
     RET    
 
 print_res:
-    CALL check_res_extra
-
     ; Load and print res_int in AX, DX
     MOV AX, [res_int]
-    MOV DX, [res_int+2] 
+    MOV DX, [res_int+2]
+    MOV [tmp3], CX 
+    MOV CX, [res_int1]
     
     MOV DI, res_dot
     
     CALL print_num
     
-    JMP restart
+    MOV CX, [tmp3]
     
-check_res_extra:
-    CMP res_int1, 0H
-    JNA no_res_extra
- 
-    MOV AX, [res_int1]
-    MOV DX, [res_int1+2]
-    MOV DI, 0H
-    
-    CALL print_num
-    
-    RET
-    
-no_res_extra:
-    RET        
+    JMP restart        
                          
 print_error: 
     LEA DX, error_msg
@@ -1008,20 +1006,36 @@ print_num:
     
     JMP print_nums               
            
-print_nums:
+print_nums:  
+    ; Print CX:DX:AX 48-bit signed num with DI "." position
+
     ; Check digits remains
     CMP AX, 0H
     JE check_len
     ;;;;
     MOV [tmp], AX
-    MOV [tmp+2], DX
-    
+    MOV [tmp+2], DX 
+    MOV [tmp2], CX
+ 
     MOV [tmp1], 0H
     MOV [tmp1+2], 0H     
+    MOV [tmp2+2], 0H
     
+    ;;;;
+    MOV AL, b.[tmp2+1]
+    MOV AH, 0H
+    XOR DX, DX 
+    DIV ten
+    MOV b.[tmp2+3], AL
+    ;;;;
+    MOV AL, b.[tmp2]
+    MOV AH, DL
+    XOR DX,DX
+    DIV ten
+    MOV b.[tmp2+2], AL
     ;;;;      
     MOV AL, b.[tmp+3]
-    MOV AH, 0H
+    MOV AH, DL
     XOR DX, DX
     DIV ten
     MOV b.[tmp1+3], AL
@@ -1049,6 +1063,7 @@ print_nums:
     
     MOV AX, [tmp1]
     MOV DX, [tmp1+2]
+    MOV CX, [tmp2+2]
     
     
     ; Increase digits length
@@ -1122,18 +1137,31 @@ print_nums_dot:
     JMP print_nums_    
 
 detect_sign:
-    ; Check DH fisrt bit for sign 
-    CMP DH, 80H
+    ; Check CX for num format
+    CMP CX, 0H
+    JE detect_sign_32bit
+    
+    CMP CH, 80H
     
     JB change_sign_pos
     
-    JMP change_sign_neg    
+    JMP change_sign_neg_48bit
+        
+
+detect_sign_32bit:
+    ; Check DH first bit for 16b-bit sign 
+    CMP DH, 80H
+     
+    JB change_sign_pos
+    
+    JMP change_sign_neg_32bit
+     
     
 change_sign_pos:
     ; If positive return
     RET
     
-change_sign_neg:
+change_sign_neg_32bit:
     ; Load AX, DX to tmp
     MOV [tmp], AX
     MOV [tmp+2], DX
@@ -1145,8 +1173,8 @@ change_sign_neg:
     
     ; Negative tmp1 
     ; Set tmp1 to 0xFFFFFFFF (-1)
-    MOV [tmp1], 0FFFFH
-    MOV [tmp1+2], 0FFFFH
+    MOV [tmp1], 0xFFFF
+    MOV [tmp1+2], 0xFFFF
     
     ; Load tmp to AX, DX
     MOV AX, [tmp]
@@ -1163,7 +1191,46 @@ change_sign_neg:
     MOV AX, [tmp1]
     MOV DX, [tmp1+2] 
     
-    RET        
+    RET
+    
+change_sign_neg_48bit: 
+    ; Load AX, DX, CX to tmp, tmp2
+    MOV [tmp], AX
+    MOV [tmp+2], DX
+    MOV [tmp2], CX
+
+    ; Print "-" char 
+    MOV AH, 02H
+    MOV DL, 2DH
+    INT 21H           
+    
+    ; Negative tmp1 
+    ; Set tmp1 to 0xFFFFFFFF (-1)
+    ; Set tmp2+2 to 0xFFFF (-1)    
+    MOV [tmp1], 0xFFFF
+    MOV [tmp1+2], 0xFFFF
+    MOV [tmp2+2], 0xFFFF
+    
+    ; Load tmp to AX, DX
+    ; Load tmp2 to CX
+    MOV AX, [tmp]
+    MOV DX, [tmp+2]
+    MOV CX, [tmp2]
+  
+    ; tmp1 - tmp  
+    SUB [tmp1], AX
+    SUB [tmp1+2], DX
+    SUB [tmp2+2], CX
+    
+    ; tmp++
+    INC tmp1
+    
+    ; Load tmp1 to AX, DX
+    MOV AX, [tmp1]
+    MOV DX, [tmp1+2]
+    MOV CX, [tmp2+2] 
+    
+    RET            
     
 end_print:
     RET  
