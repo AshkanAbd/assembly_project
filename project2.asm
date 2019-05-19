@@ -21,7 +21,8 @@ num1_dot        DW      0H
 num1_dot_       DW      0H
 num1_fill       DB      0H 
 num1_sign       DB      1H
-num1_pow        DW      1H
+num1_pow        DW      1H  
+num1_dot_detect DB      0xFF
 
 num2_int        DD      0H
 num2_int_abs    DD      0H
@@ -30,6 +31,7 @@ num2_dot_       DW      0H
 num2_fill       DB      0H
 num2_sign       DB      1H
 num2_pow        DW      1H
+num2_dot_detect DB      0xFF
 
 res_int         DD      0H
 res_int1        DD      0H  
@@ -75,7 +77,8 @@ reset_num1:
     MOV num1_dot, 0H
     MOV num1_dot_, 0H 
     MOV num1_sign, 1H
-    MOV num1_pow, 1H
+    MOV num1_pow, 1H 
+    MOV num1_dot_detect, 0xFF
     
     RET    
             
@@ -87,6 +90,7 @@ reset_num2:
     MOV num2_dot_, 0H
     MOV num2_sign, 1H
     MOV num2_pow, 1H
+    MOV num2_dot_detect, 0xFF
     
     RET
 
@@ -236,11 +240,13 @@ add_int1:
 
 find_dot1: 
     ; Check valid "."
-    CMP num1_dot, 0H
+    CMP num1_dot_detect, 0xFF
     JNE invalid_num1
     
     ; Save "." position
     MOV num1_dot, DI
+    
+    MOV num1_dot_detect, 0H
     
     JMP get_num1 
     
@@ -374,10 +380,12 @@ add_int2:
     JMP get_num2
 
 find_dot2:
-    CMP num2_dot, 0H 
+    CMP num2_dot_detect, 0xFF 
     JNE invalid_num2
 
     MOV num2_dot, DI
+    
+    MOV num2_dot_detect, 0H
     
     JMP get_num2  
     
@@ -831,6 +839,9 @@ divide:
     
     MOV AX, [num1_int_abs]
     MOV DX, [num1_int_abs+2]
+    MUL ten
+    MUL ten
+    
     CALL division 
     
     MOV [res_int], AX
@@ -842,6 +853,8 @@ divide:
     MOV AX, num1_dot
     SUB AX, num2_dot
     MOV res_dot, AX
+    ADD res_dot, 2H
+    
                    
     JMP print_res  
 
@@ -868,26 +881,29 @@ division:
        
     ;;;;      
     MOV AL, b.[tmp+3]
-    MOV AX, 0H
+    XOR AH, AH
     XOR DX, DX
     DIV [num2_int_abs]
     MOV b.[tmp1+3], AL
     ;;;;      
     MOV AL, b.[tmp+2]
     MOV AH, DL
-    XOR DX, DX
+    MOV DL, DH
+    XOR DH, DH
     DIV [num2_int_abs]
     MOV b.[tmp1+2], AL
     ;;;;      
     MOV AL, b.[tmp+1]
     MOV AH, DL
-    XOR DX, DX
+    MOV DL, DH
+    XOR DH, DH
     DIV [num2_int_abs]
     MOV b.[tmp1+1], AL
     ;;;;      
     MOV AL, b.[tmp]
     MOV AH, DL
-    XOR DX, DX
+    MOV DL, DH
+    XOR DH, DH
     DIV [num2_int_abs]
     MOV b.[tmp1], AL
     ;;;;
